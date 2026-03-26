@@ -27,6 +27,11 @@
                     <span>Claude Usage</span>
                 </div>
                 <div class="controls">
+                    <button class="control-btn force-session-btn" id="forceSessionBtn" title="Force Start 5h Session">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polygon points="5 3 19 12 5 21 5 3"/>
+                        </svg>
+                    </button>
                     <button class="control-btn settings-btn" id="settingsBtn" title="Settings">⚙️</button>
                     <button class="control-btn refresh-btn" id="refreshBtn" title="Refresh">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -156,6 +161,15 @@
                     <div class="usage-bar-group">
                         <div class="progress-bar">
                             <div class="progress-fill weekly" id="weeklyProgress" style="width: 0%"></div>
+                            <!-- 7-day tick marks (6 dividers) -->
+                            <div class="weekly-tick-marks">
+                                <span class="weekly-tick" style="left: calc(100% / 7 * 1)"></span>
+                                <span class="weekly-tick" style="left: calc(100% / 7 * 2)"></span>
+                                <span class="weekly-tick" style="left: calc(100% / 7 * 3)"></span>
+                                <span class="weekly-tick" style="left: calc(100% / 7 * 4)"></span>
+                                <span class="weekly-tick" style="left: calc(100% / 7 * 5)"></span>
+                                <span class="weekly-tick" style="left: calc(100% / 7 * 6)"></span>
+                            </div>
                         </div>
                         <span class="usage-percentage" id="weeklyPercentage">0%</span>
                     </div>
@@ -340,6 +354,16 @@
                             </div>
                             <div class="settings-col">
                                 <!-- placeholder -->
+                            </div>
+                        </div>
+
+                        <!-- Row 8: Force Session Path -->
+                        <div class="settings-row-2col">
+                            <div class="settings-col" style="flex: 1 1 100%;">
+                                <span class="settings-row-label">Force Session Path</span>
+                                <input type="text" id="forceSessionPath" class="settings-text-input"
+                                    placeholder="e.g. /path/to/safe/folder"
+                                    style="width: 100%; font-size: 11px;">
                             </div>
                         </div>
                     </div>

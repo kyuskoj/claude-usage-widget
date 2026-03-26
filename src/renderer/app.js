@@ -94,7 +94,9 @@ const elements = {
     compactWeeklyFill: document.getElementById('compactWeeklyFill'),
     compactWeeklyPct: document.getElementById('compactWeeklyPct'),
     compactSettingsOverlay: document.getElementById('compactSettingsOverlay'),
-    closeCompactSettingsBtn: document.getElementById('closeCompactSettingsBtn')
+    closeCompactSettingsBtn: document.getElementById('closeCompactSettingsBtn'),
+    forceSessionBtn: document.getElementById('forceSessionBtn'),
+    forceSessionPath: document.getElementById('forceSessionPath')
 };
 
 // Initialize
@@ -217,6 +219,30 @@ function setupEventListeners() {
     elements.closeBtn.addEventListener('click', () => {
         window.electronAPI.closeWindow();
     });
+
+    // Force 5h Session button
+    if (elements.forceSessionBtn) {
+        elements.forceSessionBtn.addEventListener('click', async () => {
+            let result = await window.electronAPI.forceStartSession();
+
+            if (result.needsPath) {
+                const userPath = prompt(
+                    'Enter a safe folder path to run Force 5h Session.\nExample: C:\\Users\\User\\Desktop\\ClaudeSafe',
+                    ''
+                );
+                if (!userPath || !userPath.trim()) return;
+                await window.electronAPI.saveForceSessionPath(userPath.trim());
+                if (elements.forceSessionPath) elements.forceSessionPath.value = userPath.trim();
+                result = await window.electronAPI.forceStartSession();
+            }
+
+            if (result.success) {
+                window.electronAPI.showNotification('Force Session', '5h Session started.');
+            } else if (result.error) {
+                window.electronAPI.showNotification('Force Session Error', result.error);
+            }
+        });
+    }
 
     // Expand/collapse toggle
     elements.expandToggle.addEventListener('click', () => {
@@ -1380,6 +1406,10 @@ async function loadSettings() {
     if (window.electronAPI.platform === 'darwin') {
         document.getElementById('trayLabel').textContent = 'Hide from Dock';
     }
+
+    if (elements.forceSessionPath) {
+        elements.forceSessionPath.value = await window.electronAPI.getForceSessionPath();
+    }
 }
 
 async function saveSettings() {
@@ -1413,6 +1443,10 @@ async function saveSettings() {
     };
     await window.electronAPI.saveSettings(settings);
     window._cachedSettings = settings;
+
+    if (elements.forceSessionPath) {
+        await window.electronAPI.saveForceSessionPath(elements.forceSessionPath.value.trim());
+    }
     applyTheme(settings.theme);
     if (window.electronAPI.platform === 'darwin') {
         document.getElementById('trayLabel').textContent = 'Hide from Dock';

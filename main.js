@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, Tray, Menu, session, shell, Notification, safeStorage } = require('electron');
 const path = require('path');
 const https = require('https');
+const { execFile } = require('child_process');
 const Store = require('electron-store');
 const { fetchViaWindow } = require('./src/fetch-via-window');
 
@@ -449,6 +450,45 @@ ipcMain.handle('save-settings', (event, settings) => {
   }
 
   return true;
+});
+
+// Force 5h Session: run `claude -p "say 1"` in the saved safe folder
+
+ipcMain.handle('force-start-session', async () => {
+  const safePath = store.get('settings.forceSessionPath', '');
+  if (!safePath) {
+    return { needsPath: true };
+  }
+  // Validate the path is an existing directory before using it
+  try {
+    const stat = fs.statSync(safePath);
+    if (!stat.isDirectory()) {
+      return { success: false, error: 'Force Session Path is not a directory.' };
+    }
+  } catch {
+    return { success: false, error: 'Force Session Path does not exist.' };
+  }
+  return new Promise((resolve) => {
+    execFile('claude', ['-p', 'say 1'], {
+      cwd: safePath,
+      timeout: 30000
+    }, (error, stdout) => {
+      if (error) {
+        resolve({ success: false, error: error.message });
+      } else {
+        resolve({ success: true, output: stdout });
+      }
+    });
+  });
+});
+
+ipcMain.handle('save-force-session-path', (event, folderPath) => {
+  store.set('settings.forceSessionPath', folderPath);
+  return true;
+});
+
+ipcMain.handle('get-force-session-path', () => {
+  return store.get('settings.forceSessionPath', '');
 });
 
 // Open a visible BrowserWindow for the user to log in to Claude.ai.
