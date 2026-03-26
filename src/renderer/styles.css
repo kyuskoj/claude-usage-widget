@@ -672,6 +672,15 @@ body.theme-light .graph-btn.active {
     transform: translateX(-50%);
 }
 
+.weekly-elapsed-tick {
+    position: absolute;
+    top: 0;
+    width: 2px;
+    height: 100%;
+    background-color: rgba(255, 255, 255, 0.9);
+    transform: translateX(-50%);
+}
+
 .progress-fill.extra {
     background: linear-gradient(90deg, #10b981 0%, #34d399 100%);
     box-shadow: 0 0 10px rgba(16, 185, 129, 0.3);

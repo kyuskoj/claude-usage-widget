@@ -53,6 +53,7 @@ const elements = {
     weeklyTimer: document.getElementById('weeklyTimer'),
     weeklyTimeText: document.getElementById('weeklyTimeText'),
     weeklyResetsAt: document.getElementById('weeklyResetsAt'),
+    weeklyElapsedTick: document.getElementById('weeklyElapsedTick'),
 
     sessionResetsAt: document.getElementById('sessionResetsAt'),
 
@@ -953,8 +954,26 @@ function refreshTimers() {
         weeklyResetsAt,
         7 * 24 * 60 // 7 days in minutes
     );
+    updateWeeklyElapsedTick(weeklyResetsAt);
     elements.weeklyResetsAt.textContent = formatResetsAt(weeklyResetsAt, true, timeFormat, weeklyDateFormat);
     elements.weeklyResetsAt.style.opacity = weeklyResetsAt ? '1' : '0.4';
+}
+
+// Update the white elapsed-day tick mark on the Weekly Limit progress bar.
+// Position = (elapsed ms / 7-day total ms) * 100 %.
+function updateWeeklyElapsedTick(resetsAt) {
+    const tick = elements.weeklyElapsedTick;
+    if (!tick) return;
+    if (!resetsAt) {
+        tick.style.display = 'none';
+        return;
+    }
+    const totalMs = 7 * 24 * 60 * 60 * 1000;
+    const remainingMs = new Date(resetsAt) - new Date();
+    const elapsedMs = totalMs - remainingMs;
+    const elapsedPct = Math.min(Math.max((elapsedMs / totalMs) * 100, 0), 100);
+    tick.style.left = `${elapsedPct}%`;
+    tick.style.display = '';
 }
 
 function startCountdown() {
