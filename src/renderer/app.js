@@ -226,13 +226,10 @@ function setupEventListeners() {
             let result = await window.electronAPI.forceStartSession();
 
             if (result.needsPath) {
-                const userPath = prompt(
-                    'Enter a safe folder path to run Force 5h Session.\nExample: C:\\Users\\User\\Desktop\\ClaudeSafe',
-                    ''
-                );
-                if (!userPath || !userPath.trim()) return;
-                await window.electronAPI.saveForceSessionPath(userPath.trim());
-                if (elements.forceSessionPath) elements.forceSessionPath.value = userPath.trim();
+                const userPath = await window.electronAPI.showFolderDialog();
+                if (!userPath) return;
+                await window.electronAPI.saveForceSessionPath(userPath);
+                if (elements.forceSessionPath) elements.forceSessionPath.value = userPath;
                 result = await window.electronAPI.forceStartSession();
             }
 

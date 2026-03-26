@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Tray, Menu, session, shell, Notification, safeStorage } = require('electron');
+const { app, BrowserWindow, ipcMain, Tray, Menu, session, shell, Notification, safeStorage, dialog } = require('electron');
 const path = require('path');
 const https = require('https');
 const { execFile } = require('child_process');
@@ -453,6 +453,15 @@ ipcMain.handle('save-settings', (event, settings) => {
 });
 
 // Force 5h Session: run `claude -p "say 1"` in the saved safe folder
+
+ipcMain.handle('show-folder-dialog', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ['openDirectory'],
+    title: 'Select Safe Folder for Force Session'
+  });
+  if (result.canceled || !result.filePaths.length) return null;
+  return result.filePaths[0];
+});
 
 ipcMain.handle('force-start-session', async () => {
   const safePath = store.get('settings.forceSessionPath', '');

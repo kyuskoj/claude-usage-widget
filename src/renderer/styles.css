@@ -634,6 +634,7 @@ body.theme-light .graph-btn.active {
     margin: 0;
     /* Remove margin as it is in grid */
     min-width: 80px;
+    position: relative;
 }
 
 .progress-fill {

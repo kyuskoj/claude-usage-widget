@@ -75,5 +75,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Force 5h Session
   forceStartSession: () => ipcRenderer.invoke('force-start-session'),
   saveForceSessionPath: (folderPath) => ipcRenderer.invoke('save-force-session-path', folderPath),
-  getForceSessionPath: () => ipcRenderer.invoke('get-force-session-path')
+  getForceSessionPath: () => ipcRenderer.invoke('get-force-session-path'),
+  showFolderDialog: () => ipcRenderer.invoke('show-folder-dialog')
 });
