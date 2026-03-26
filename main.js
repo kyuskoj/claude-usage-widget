@@ -463,6 +463,27 @@ ipcMain.handle('show-folder-dialog', async () => {
   return result.filePaths[0];
 });
 
+// Build an extended PATH that includes common locations where the `claude`
+// CLI (Claude Code) is installed via npm, Homebrew, or user-local prefixes.
+// Electron launches with a minimal PATH that typically omits these directories.
+function buildExtendedPath() {
+  const home = os.homedir();
+  const isWin = process.platform === 'win32';
+  const extraDirs = isWin
+    ? [
+        path.join(process.env.APPDATA || path.join(home, 'AppData', 'Roaming'), 'npm'),
+        path.join(home, 'AppData', 'Roaming', 'npm'),
+      ]
+    : [
+        '/usr/local/bin',
+        '/opt/homebrew/bin',
+        path.join(home, '.npm-global', 'bin'),
+        path.join(home, '.local', 'bin'),
+      ];
+  const sep = isWin ? ';' : ':';
+  return [...new Set([...extraDirs, process.env.PATH || ''])].join(sep);
+}
+
 ipcMain.handle('force-start-session', async () => {
   const safePath = store.get('settings.forceSessionPath', '');
   if (!safePath) {
@@ -477,10 +498,16 @@ ipcMain.handle('force-start-session', async () => {
   } catch {
     return { success: false, error: 'Force Session Path does not exist.' };
   }
+  // On Windows the npm-installed binary is a .cmd wrapper, so shell: true is
+  // required.  On macOS/Linux shell is not needed but we pass the extended
+  // PATH so Electron can find the globally-installed `claude` binary.
+  const isWin = process.platform === 'win32';
   return new Promise((resolve) => {
-    execFile('claude', ['-p', 'say 1'], {
+    execFile(isWin ? 'claude.cmd' : 'claude', ['-p', 'say 1'], {
       cwd: safePath,
-      timeout: 30000
+      timeout: 30000,
+      shell: isWin,
+      env: { ...process.env, PATH: buildExtendedPath() }
     }, (error, stdout) => {
       if (error) {
         resolve({ success: false, error: error.message });
