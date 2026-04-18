@@ -967,7 +967,7 @@ ipcMain.handle('force-start-session', async () => {
   // PATH so Electron can find the globally-installed `claude` binary.
   const isWin = process.platform === 'win32';
   return new Promise((resolve) => {
-    execFile(isWin ? 'claude.cmd' : 'claude', ['-p', 'say 1'], {
+    execFile(isWin ? 'claude.cmd' : 'claude', ['-p', 'say 1', '--model', 'haiku'], {
       cwd: safePath,
       timeout: 30000,
       shell: isWin,
