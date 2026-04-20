@@ -53,6 +53,7 @@ const elements = {
     weeklyTimer: document.getElementById('weeklyTimer'),
     weeklyTimeText: document.getElementById('weeklyTimeText'),
     weeklyResetsAt: document.getElementById('weeklyResetsAt'),
+    weeklyElapsedTick: document.getElementById('weeklyElapsedTick'),
 
     sessionResetsAt: document.getElementById('sessionResetsAt'),
 
@@ -97,7 +98,9 @@ const elements = {
     compactWeeklyFill: document.getElementById('compactWeeklyFill'),
     compactWeeklyPct: document.getElementById('compactWeeklyPct'),
     compactSettingsOverlay: document.getElementById('compactSettingsOverlay'),
-    closeCompactSettingsBtn: document.getElementById('closeCompactSettingsBtn')
+    closeCompactSettingsBtn: document.getElementById('closeCompactSettingsBtn'),
+    forceSessionBtn: document.getElementById('forceSessionBtn'),
+    forceSessionPath: document.getElementById('forceSessionPath')
 };
 
 // Populate organization selector dropdown
@@ -266,6 +269,27 @@ function setupEventListeners() {
     elements.closeBtn.addEventListener('click', () => {
         window.electronAPI.closeWindow();
     });
+
+    // Force 5h Session button
+    if (elements.forceSessionBtn) {
+        elements.forceSessionBtn.addEventListener('click', async () => {
+            let result = await window.electronAPI.forceStartSession();
+
+            if (result.needsPath) {
+                const userPath = await window.electronAPI.showFolderDialog();
+                if (!userPath) return;
+                await window.electronAPI.saveForceSessionPath(userPath);
+                if (elements.forceSessionPath) elements.forceSessionPath.value = userPath;
+                result = await window.electronAPI.forceStartSession();
+            }
+
+            if (result.success) {
+                window.electronAPI.showNotification('Force Session', '5h Session started.');
+            } else if (result.error) {
+                window.electronAPI.showNotification('Force Session Error', result.error);
+            }
+        });
+    }
 
     // Expand/collapse toggle
     elements.expandToggle.addEventListener('click', () => {
@@ -989,8 +1013,26 @@ function refreshTimers() {
         weeklyResetsAt,
         7 * 24 * 60 // 7 days in minutes
     );
+    updateWeeklyElapsedTick(weeklyResetsAt);
     elements.weeklyResetsAt.textContent = formatResetsAt(weeklyResetsAt, true, timeFormat, weeklyDateFormat);
     elements.weeklyResetsAt.style.opacity = weeklyResetsAt ? '1' : '0.4';
+}
+
+// Update the white elapsed-day tick mark on the Weekly Limit progress bar.
+// Position = (elapsed ms / 7-day total ms) * 100 %.
+function updateWeeklyElapsedTick(resetsAt) {
+    const tick = elements.weeklyElapsedTick;
+    if (!tick) return;
+    if (!resetsAt) {
+        tick.style.display = 'none';
+        return;
+    }
+    const totalMs = 7 * 24 * 60 * 60 * 1000;
+    const remainingMs = new Date(resetsAt) - new Date();
+    const elapsedMs = totalMs - remainingMs;
+    const elapsedPct = Math.min(Math.max((elapsedMs / totalMs) * 100, 0), 100);
+    tick.style.left = `${elapsedPct}%`;
+    tick.style.display = '';
 }
 
 function startCountdown() {
@@ -1445,6 +1487,10 @@ async function loadSettings() {
     if (window.electronAPI.platform === 'darwin') {
         document.getElementById('trayLabel').textContent = 'Hide from Dock';
     }
+
+    if (elements.forceSessionPath) {
+        elements.forceSessionPath.value = await window.electronAPI.getForceSessionPath();
+    }
 }
 
 async function saveSettings() {
@@ -1479,6 +1525,10 @@ async function saveSettings() {
     };
     await window.electronAPI.saveSettings(settings);
     window._cachedSettings = settings;
+
+    if (elements.forceSessionPath) {
+        await window.electronAPI.saveForceSessionPath(elements.forceSessionPath.value.trim());
+    }
     applyTheme(settings.theme);
     if (window.electronAPI.platform === 'darwin') {
         document.getElementById('trayLabel').textContent = 'Hide from Dock';

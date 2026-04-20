@@ -1,6 +1,7 @@
-const { app, BrowserWindow, ipcMain, Tray, Menu, session, shell, Notification, safeStorage, nativeImage } = require('electron');
+const { app, BrowserWindow, ipcMain, Tray, Menu, session, shell, Notification, safeStorage, dialog, nativeImage } = require('electron');
 const path = require('path');
 const https = require('https');
+const { execFile } = require('child_process');
 const Store = require('electron-store');
 const { fetchViaWindow } = require('./src/fetch-via-window');
 
@@ -913,6 +914,81 @@ ipcMain.handle('save-settings', (event, settings) => {
   }
 
   return true;
+});
+
+// Force 5h Session: run `claude -p "say 1"` in the saved safe folder
+
+ipcMain.handle('show-folder-dialog', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ['openDirectory'],
+    title: 'Select Safe Folder for Force Session'
+  });
+  if (result.canceled || !result.filePaths.length) return null;
+  return result.filePaths[0];
+});
+
+// Build an extended PATH that includes common locations where the `claude`
+// CLI (Claude Code) is installed via npm, Homebrew, or user-local prefixes.
+// Electron launches with a minimal PATH that typically omits these directories.
+function buildExtendedPath() {
+  const home = os.homedir();
+  const isWin = process.platform === 'win32';
+  const extraDirs = isWin
+    ? [
+        path.join(process.env.APPDATA || path.join(home, 'AppData', 'Roaming'), 'npm'),
+        path.join(home, 'AppData', 'Roaming', 'npm'),
+      ]
+    : [
+        '/usr/local/bin',
+        '/opt/homebrew/bin',
+        path.join(home, '.npm-global', 'bin'),
+        path.join(home, '.local', 'bin'),
+      ];
+  const sep = isWin ? ';' : ':';
+  return [...new Set([...extraDirs, process.env.PATH || ''])].join(sep);
+}
+
+ipcMain.handle('force-start-session', async () => {
+  const safePath = store.get('settings.forceSessionPath', '');
+  if (!safePath) {
+    return { needsPath: true };
+  }
+  // Validate the path is an existing directory before using it
+  try {
+    const stat = fs.statSync(safePath);
+    if (!stat.isDirectory()) {
+      return { success: false, error: 'Force Session Path is not a directory.' };
+    }
+  } catch {
+    return { success: false, error: 'Force Session Path does not exist.' };
+  }
+  // On Windows the npm-installed binary is a .cmd wrapper, so shell: true is
+  // required.  On macOS/Linux shell is not needed but we pass the extended
+  // PATH so Electron can find the globally-installed `claude` binary.
+  const isWin = process.platform === 'win32';
+  return new Promise((resolve) => {
+    execFile(isWin ? 'claude.cmd' : 'claude', ['-p', 'say 1', '--model', 'haiku'], {
+      cwd: safePath,
+      timeout: 30000,
+      shell: isWin,
+      env: { ...process.env, PATH: buildExtendedPath() }
+    }, (error, stdout) => {
+      if (error) {
+        resolve({ success: false, error: error.message });
+      } else {
+        resolve({ success: true, output: stdout });
+      }
+    });
+  });
+});
+
+ipcMain.handle('save-force-session-path', (event, folderPath) => {
+  store.set('settings.forceSessionPath', folderPath);
+  return true;
+});
+
+ipcMain.handle('get-force-session-path', () => {
+  return store.get('settings.forceSessionPath', '');
 });
 
 // Open a visible BrowserWindow for the user to log in to Claude.ai.

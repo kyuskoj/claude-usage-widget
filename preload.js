@@ -70,5 +70,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   showNotification: (title, body) => ipcRenderer.send('show-notification', { title, body }),
 
   // Compact mode
-  setCompactMode: (compact) => ipcRenderer.send('set-compact-mode', compact)
+  setCompactMode: (compact) => ipcRenderer.send('set-compact-mode', compact),
+
+  // Force 5h Session
+  forceStartSession: () => ipcRenderer.invoke('force-start-session'),
+  saveForceSessionPath: (folderPath) => ipcRenderer.invoke('save-force-session-path', folderPath),
+  getForceSessionPath: () => ipcRenderer.invoke('get-force-session-path'),
+  showFolderDialog: () => ipcRenderer.invoke('show-folder-dialog')
 });
