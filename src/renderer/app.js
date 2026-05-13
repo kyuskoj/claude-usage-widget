@@ -292,7 +292,8 @@ function setupEventListeners() {
     }
 
     // Expand/collapse toggle
-    elements.expandToggle.addEventListener('click', () => {
+    elements.expandToggle.addEventListener('click', async () => {
+        const wasExpanded = isExpanded;
         isExpanded = !isExpanded;
         elements.expandArrow.classList.toggle('expanded', isExpanded);
         elements.expandSection.style.display = isExpanded ? 'block' : 'none';
@@ -300,7 +301,21 @@ function setupEventListeners() {
             loadChart();
         }
         resizeWidget();
-        _saveViewState();
+        
+        // CRITICAL: Update expandedOpen setting IMMEDIATELY (no debounce) to prevent race condition
+        // If we wait for the debounced save, auto-refresh might fetch with stale expandedOpen=false
+        const settings = window._cachedSettings || await window.electronAPI.getSettings();
+        settings.expandedOpen = isExpanded;
+        window._cachedSettings = settings;
+        await window.electronAPI.saveSettings(settings);
+        
+        // Trigger immediate fetch if panel was just opened (collapsed → expanded)
+        // This ensures fresh overage/prepaid data is available when user expands the panel
+        // Pass forceExtended to bypass any cached setting and fetch extended data immediately
+        if (!wasExpanded && isExpanded) {
+            debugLog('[Conditional Polling] Panel expanded - triggering immediate fetch with extended data');
+            await fetchUsageData({ forceExtended: true });
+        }
     });
 
     // Settings close
@@ -329,6 +344,21 @@ function setupEventListeners() {
             btn.classList.add('active');
             applyTheme(btn.dataset.theme);
         });
+    });
+
+    // Prevent accidental app hiding: bidirectional coupling between Hide from Taskbar and Show Tray Stats
+    // If user enables "Hide from Taskbar", automatically enable "Show Tray Stats" (ensures tray icon is visible)
+    elements.minimizeToTrayToggle.addEventListener('change', () => {
+        if (elements.minimizeToTrayToggle.checked && !elements.showTrayStatsToggle.checked) {
+            elements.showTrayStatsToggle.checked = true;
+        }
+    });
+
+    // If user disables "Show Tray Stats", automatically disable "Hide from Taskbar" (prevents app from being completely hidden)
+    elements.showTrayStatsToggle.addEventListener('change', () => {
+        if (!elements.showTrayStatsToggle.checked && elements.minimizeToTrayToggle.checked) {
+            elements.minimizeToTrayToggle.checked = false;
+        }
     });
 
     // Listen for refresh requests from tray
@@ -482,7 +512,7 @@ async function handleAutoDetect() {
 }
 
 // Fetch usage data from Claude API
-async function fetchUsageData() {
+async function fetchUsageData(options = {}) {
     debugLog('fetchUsageData called');
 
     if (isFetching) {
@@ -499,7 +529,7 @@ async function fetchUsageData() {
     isFetching = true;
     try {
         debugLog('Calling electronAPI.fetchUsageData...');
-        const data = await window.electronAPI.fetchUsageData();
+        const data = await window.electronAPI.fetchUsageData(options);
         debugLog('Received usage data:', data);
         updateUI(data);
     } catch (error) {
@@ -521,7 +551,7 @@ async function fetchUsageData() {
 // Known unambiguous symbols are used; everything else falls back to the
 // ISO 4217 code as a suffix so the display is always correct.
 function formatCurrency(amountCents, currencyCode) {
-  const amount = (amountCents / 100).toFixed(0);
+  const amount = (amountCents / 100).toFixed(2);
   const symbols = { USD: '$', EUR: '€', GBP: '£' };
   const sym = symbols[currencyCode];
   return sym ? `${sym}${amount}` : `${amount} ${currencyCode || 'USD'}`;
@@ -537,6 +567,20 @@ const EXTRA_ROW_CONFIG = {
 };
 
 function buildExtraRows(data) {
+    // Don't clear existing rows if we don't have new data to replace them with
+    // This preserves the last known state when expanding the panel
+    const hasAnyExtendedData = Object.entries(EXTRA_ROW_CONFIG).some(([key, config]) => {
+        const value = data[key];
+        const hasUtilization = value && value.utilization !== undefined;
+        const hasBalance = key === 'extra_usage' && value && value.balance_cents != null;
+        return hasUtilization || hasBalance;
+    });
+    
+    // Only rebuild if we have data, otherwise keep existing rows
+    if (!hasAnyExtendedData && elements.extraRows.children.length > 0) {
+        return; // Keep existing rows
+    }
+    
     elements.extraRows.innerHTML = '';
     let count = 0;
 
@@ -1199,10 +1243,10 @@ function showMainContent() {
     if (elements.compactCollapseBtn) {
         elements.compactCollapseBtn.style.display = isCompactMode ? 'none' : 'flex';
     }
-    // Restore header buttons after login
+    // Restore header buttons after login - but respect compact mode for graph button
     elements.settingsBtn.style.display = 'flex';
     elements.refreshBtn.style.display = 'flex';
-    elements.graphBtn.style.display = 'flex';
+    elements.graphBtn.style.display = isCompactMode ? 'none' : 'flex';
 }
 
 // Auto-update management
